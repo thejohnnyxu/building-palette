@@ -1,0 +1,3 @@
+displayName = Building Palette
+author = thejo
+version = 0.1.0
