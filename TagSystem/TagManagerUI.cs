@@ -40,6 +40,22 @@ namespace BuildingPalette
         private int    _tick         = 0;
         private const int BlinkRate  = 30;
 
+        // Scroll state — pixel offset from the top of each list's content
+        private int _itemListScroll   = 0;
+        private int _searchScroll     = 0;
+        private int _tagListScroll    = 0;
+        private int _itemListContent  = 0; // total content height in pixels
+        private int _searchContent    = 0;
+        private int _tagListContent   = 0;
+        private const int ScrollStep  = RowH + 4;
+
+        // Scrollbar drag state
+        private enum DragTarget { None, TagList, ItemList, SearchResults }
+        private DragTarget _dragTarget    = DragTarget.None;
+        private int        _dragStartY    = 0;  // mouse Y when drag started
+        private int        _dragStartScroll = 0; // scroll value when drag started
+        private bool       _prevMouseLeftDrag = false;
+
         // Scan results mode
         private List<(int itemId, string name)> _scanResults = new();
         private HashSet<int> _scanSelected = new();   // itemIds checked for tagging
@@ -104,7 +120,8 @@ namespace BuildingPalette
             exportBtn.Top.Set(7, 0f);
             exportBtn.BackgroundColor = new Color(28, 55, 38, 255);
             exportBtn.BorderColor     = new Color(60, 120, 80, 255);
-            exportBtn.SetPadding(0);
+            exportBtn.PaddingTop  = 5;
+            exportBtn.PaddingLeft = 8;
             exportBtn.OnLeftClick += (_, _) =>
             {
                 if (_selectedTag == null)
@@ -126,7 +143,8 @@ namespace BuildingPalette
             importBtn.Top.Set(7, 0f);
             importBtn.BackgroundColor = new Color(28, 40, 70, 255);
             importBtn.BorderColor     = new Color(74, 106, 156, 255);
-            importBtn.SetPadding(0);
+            importBtn.PaddingTop  = 5;
+            importBtn.PaddingLeft = 8;
             importBtn.OnLeftClick += (_, _) =>
             {
                 TagManagerUISystem.Close();
@@ -150,6 +168,7 @@ namespace BuildingPalette
             _tagList.BackgroundColor = new Color(20, 28, 48, 255);
             _tagList.BorderColor     = new Color(50, 80, 130, 255);
             _tagList.SetPadding(0);
+            _tagList.OverflowHidden  = true;
             _root.Append(_tagList);
 
             // ── Right: selected tag label ─────────────────────────────────────
@@ -168,6 +187,7 @@ namespace BuildingPalette
             _itemList.BackgroundColor = new Color(20, 28, 48, 255);
             _itemList.BorderColor     = new Color(50, 80, 130, 255);
             _itemList.SetPadding(0);
+            _itemList.OverflowHidden  = true;
             _root.Append(_itemList);
 
             // ── Right: search label ───────────────────────────────────────────
@@ -187,7 +207,13 @@ namespace BuildingPalette
             _searchBox.BackgroundColor = new Color(20, 28, 48, 255);
             _searchBox.BorderColor     = new Color(50, 80, 130, 255);
             _searchBox.SetPadding(0);
-            _searchBox.OnLeftClick += (_, _) => _focused = true;
+            // OnLeftClick fires inside _ui.Update() which runs inside the blocking layer,
+            // after HandleFocusClick has already been evaluated for this frame.
+            _searchBox.OnLeftClick += (_, _) =>
+            {
+                _focused = true;
+                _scanTagFocused = false;
+            };
             _root.Append(_searchBox);
 
             _searchDisplay = new UIText("", 0.72f);
@@ -204,6 +230,7 @@ namespace BuildingPalette
             _searchResults.BackgroundColor = new Color(20, 28, 48, 255);
             _searchResults.BorderColor     = new Color(50, 80, 130, 255);
             _searchResults.SetPadding(0);
+            _searchResults.OverflowHidden  = true;
             _root.Append(_searchResults);
 
             // ── Scan results overlay ──────────────────────────────────────────
@@ -225,6 +252,10 @@ namespace BuildingPalette
             _searchInput     = "";
             _focused         = false;
             _tick            = 0;
+            _itemListScroll  = 0;
+            _searchScroll    = 0;
+            _tagListScroll   = 0;
+            _dragTarget      = DragTarget.None;
 
             // Hide scan panel if it was showing
             _root.RemoveChild(_scanPanel);
@@ -481,7 +512,13 @@ namespace BuildingPalette
                 .OrderBy(t => t)
                 .ToList();
 
-            int y = 4;
+            int contentH = allTags.Count * (RowH + 4);
+            _tagListContent = contentH;
+            int panelH = (int)_tagList.GetDimensions().Height;
+            if (panelH <= 0) panelH = H - HeaderH - Pad - 18 - Pad;
+            _tagListScroll = System.Math.Clamp(_tagListScroll, 0, System.Math.Max(0, contentH - panelH));
+
+            int y = 4 - _tagListScroll;
             foreach (var tag in allTags)
             {
                 string captured = tag;
@@ -492,18 +529,16 @@ namespace BuildingPalette
                 row.Top.Set(y, 0f);
                 row.Width.Set(TagColW - 8, 0f);
                 row.Height.Set(RowH, 0f);
-                row.PaddingTop  = (RowH - 14) / 2f; // vertically centre the text
+                row.PaddingTop  = (RowH - 14) / 2f;
                 row.PaddingLeft = 6;
-                row.BackgroundColor = isSelected
-                    ? new Color(50, 90, 160, 255)
-                    : new Color(30, 44, 72, 255);
-                row.BorderColor = isSelected
-                    ? new Color(100, 160, 255, 255)
-                    : new Color(50, 80, 130, 255);
+                row.BackgroundColor = isSelected ? new Color(50, 90, 160, 255) : new Color(30, 44, 72, 255);
+                row.BorderColor     = isSelected ? new Color(100, 160, 255, 255) : new Color(50, 80, 130, 255);
                 row.OnLeftClick += (_, _) =>
                 {
-                    _selectedTag = captured;
-                    _searchInput = "";
+                    _selectedTag    = captured;
+                    _searchInput    = "";
+                    _itemListScroll = 0;
+                    _searchScroll   = 0;
                     RefreshTagList();
                     RefreshItemList();
                     RefreshSearchResults();
@@ -523,6 +558,7 @@ namespace BuildingPalette
                 _tagList.Append(empty);
             }
 
+            DrawScrollbar(_tagList, _tagListScroll, _tagListContent, H - HeaderH - Pad - 18 - Pad, ref _tagListThumbRect);
             _tagList.Recalculate();
         }
 
@@ -543,7 +579,11 @@ namespace BuildingPalette
             }
 
             var items = TagItemIndex.GetTaggedItems(_selectedTag);
-            int y = 4;
+            int itemListH = (H - HeaderH - Pad - 18 - Pad) / 2 - Pad;
+            int contentH  = items.Count * (RowH + 4);
+            _itemListContent = contentH;
+            _itemListScroll  = System.Math.Clamp(_itemListScroll, 0, System.Math.Max(0, contentH - itemListH));
+            int y = 4 - _itemListScroll;
 
             foreach (var (id, name) in items)
             {
@@ -561,24 +601,25 @@ namespace BuildingPalette
 
                 var icon = new UIItemIcon(GetItem(capturedId), false);
                 icon.Left.Set(4, 0f);
-                icon.Top.Set(1, 0f);
-                icon.Width.Set(24, 0f);
-                icon.Height.Set(24, 0f);
+                icon.Top.Set((RowH - 20) / 2, 0f);
+                icon.Width.Set(20, 0f);
+                icon.Height.Set(20, 0f);
                 row.Append(icon);
 
                 var label = new UIText(capturedName, 0.68f);
-                label.Left.Set(32, 0f);
-                label.Top.Set(6, 0f);
+                label.Left.Set(28, 0f);
+                label.Top.Set((RowH - 14) / 2, 0f);
                 row.Append(label);
 
-                var removeBtn = new UITextPanel<string>("×", 0.7f);
-                removeBtn.Width.Set(24, 0f);
-                removeBtn.Height.Set(24, 0f);
-                removeBtn.Left.Set(RightW - 36, 0f);
-                removeBtn.Top.Set(2, 0f);
+                var removeBtn = new UITextPanel<string>("×", 1.2f);
+                removeBtn.Width.Set(28, 0f);
+                removeBtn.Height.Set(26, 0f);
+                removeBtn.Left.Set(RightW - 44, 0f);
+                removeBtn.Top.Set(1, 0f);
                 removeBtn.BackgroundColor = new Color(68, 28, 28, 255);
                 removeBtn.BorderColor     = new Color(130, 60, 60, 255);
-                removeBtn.SetPadding(0);
+                removeBtn.PaddingTop  = 1;
+                removeBtn.PaddingLeft = 5;
                 removeBtn.OnLeftClick += (_, _) =>
                 {
                     TagSystem.RemoveTag(capturedId, _selectedTag);
@@ -600,6 +641,7 @@ namespace BuildingPalette
                 _itemList.Append(empty);
             }
 
+            DrawScrollbar(_itemList, _itemListScroll, _itemListContent, itemListH, ref _itemListThumbRect);
             _itemList.Recalculate();
         }
 
@@ -622,7 +664,12 @@ namespace BuildingPalette
             }
 
             var results = TagItemIndex.Search(_searchInput, _selectedTag, MaxResults);
-            int y = 4;
+            int searchBoxTop = (H - HeaderH - Pad - 18 - Pad) / 2 - Pad + Pad + 18 + SearchH + Pad;
+            int searchPanelH = H - searchBoxTop - SearchH - Pad * 2;
+            int contentH2    = results.Count * (RowH + 4);
+            _searchContent   = contentH2;
+            _searchScroll    = System.Math.Clamp(_searchScroll, 0, System.Math.Max(0, contentH2 - searchPanelH));
+            int y = 4 - _searchScroll;
 
             foreach (var (id, name) in results)
             {
@@ -639,24 +686,25 @@ namespace BuildingPalette
 
                 var icon = new UIItemIcon(GetItem(capturedId), false);
                 icon.Left.Set(4, 0f);
-                icon.Top.Set(1, 0f);
-                icon.Width.Set(24, 0f);
-                icon.Height.Set(24, 0f);
+                icon.Top.Set((RowH - 20) / 2, 0f);
+                icon.Width.Set(20, 0f);
+                icon.Height.Set(20, 0f);
                 row.Append(icon);
 
                 var label = new UIText(name, 0.68f);
-                label.Left.Set(32, 0f);
-                label.Top.Set(6, 0f);
+                label.Left.Set(28, 0f);
+                label.Top.Set((RowH - 14) / 2, 0f);
                 row.Append(label);
 
-                var addBtn = new UITextPanel<string>("+", 0.7f);
-                addBtn.Width.Set(24, 0f);
-                addBtn.Height.Set(24, 0f);
-                addBtn.Left.Set(RightW - 36, 0f);
-                addBtn.Top.Set(2, 0f);
+                var addBtn = new UITextPanel<string>("+", 1.2f);
+                addBtn.Width.Set(28, 0f);
+                addBtn.Height.Set(26, 0f);
+                addBtn.Left.Set(RightW - 44, 0f);
+                addBtn.Top.Set(1, 0f);
                 addBtn.BackgroundColor = new Color(28, 68, 38, 255);
                 addBtn.BorderColor     = new Color(60, 140, 80, 255);
-                addBtn.SetPadding(0);
+                addBtn.PaddingTop  = 1;
+                addBtn.PaddingLeft = 5;
                 addBtn.OnLeftClick += (_, _) =>
                 {
                     TagSystem.AddTag(capturedId, _selectedTag);
@@ -677,6 +725,7 @@ namespace BuildingPalette
                 _searchResults.Append(empty);
             }
 
+            DrawScrollbar(_searchResults, _searchScroll, _searchContent, searchPanelH, ref _searchThumbRect);
             _searchResults.Recalculate();
         }
 
@@ -690,6 +739,115 @@ namespace BuildingPalette
         public void HandleInput()
         {
             _tick++;
+
+            bool mouseJustPressed = Main.mouseLeft && !_prevMouseLeftDrag;
+            _prevMouseLeftDrag    = Main.mouseLeft;
+            var mousePos = new Point(Main.mouseX, Main.mouseY);
+
+            // ── Scrollbar drag ────────────────────────────────────────────────
+            if (Main.mouseLeft)
+            {
+                if (_dragTarget == DragTarget.None && mouseJustPressed)
+                {
+                    // Inflate thumb rect a little for easier grabbing
+                    var tagThumb  = _tagListThumbRect;   tagThumb.Inflate(4, 0);
+                    var itemThumb = _itemListThumbRect;  itemThumb.Inflate(4, 0);
+                    var srchThumb = _searchThumbRect;    srchThumb.Inflate(4, 0);
+
+                    if (!tagThumb.IsEmpty  && tagThumb.Contains(mousePos))
+                    {
+                        _dragTarget     = DragTarget.TagList;
+                        _dragStartY     = Main.mouseY;
+                        _dragStartScroll = _tagListScroll;
+                    }
+                    else if (!itemThumb.IsEmpty && itemThumb.Contains(mousePos))
+                    {
+                        _dragTarget     = DragTarget.ItemList;
+                        _dragStartY     = Main.mouseY;
+                        _dragStartScroll = _itemListScroll;
+                    }
+                    else if (!srchThumb.IsEmpty && srchThumb.Contains(mousePos))
+                    {
+                        _dragTarget     = DragTarget.SearchResults;
+                        _dragStartY     = Main.mouseY;
+                        _dragStartScroll = _searchScroll;
+                    }
+                }
+
+                if (_dragTarget != DragTarget.None)
+                {
+                    int mouseDelta = Main.mouseY - _dragStartY;
+
+                    if (_dragTarget == DragTarget.TagList && _tagListContent > 0)
+                    {
+                        int panelH   = H - HeaderH - Pad - 18 - Pad;
+                        float ratio  = (float)_tagListContent / panelH;
+                        _tagListScroll = System.Math.Clamp(
+                            _dragStartScroll + (int)(mouseDelta * ratio), 0,
+                            System.Math.Max(0, _tagListContent - panelH));
+                        RefreshTagList();
+                    }
+                    else if (_dragTarget == DragTarget.ItemList && _itemListContent > 0)
+                    {
+                        int panelH   = (H - HeaderH - Pad - 18 - Pad) / 2 - Pad;
+                        float ratio  = (float)_itemListContent / panelH;
+                        _itemListScroll = System.Math.Clamp(
+                            _dragStartScroll + (int)(mouseDelta * ratio), 0,
+                            System.Math.Max(0, _itemListContent - panelH));
+                        RefreshItemList();
+                    }
+                    else if (_dragTarget == DragTarget.SearchResults && _searchContent > 0)
+                    {
+                        int searchBoxTop = (H - HeaderH - Pad - 18 - Pad) / 2 - Pad + Pad + 18 + SearchH + Pad;
+                        int panelH       = H - searchBoxTop - SearchH - Pad * 2;
+                        float ratio      = (float)_searchContent / panelH;
+                        _searchScroll = System.Math.Clamp(
+                            _dragStartScroll + (int)(mouseDelta * ratio), 0,
+                            System.Math.Max(0, _searchContent - panelH));
+                        RefreshSearchResults();
+                    }
+
+                    // Block vanilla from acting on the drag click
+                    Main.LocalPlayer.mouseInterface = true;
+                    return;
+                }
+            }
+            else
+            {
+                _dragTarget = DragTarget.None;
+            }
+
+            // ── Mouse wheel scrolling ─────────────────────────────────────────
+            if (IsMouseOver() && PlayerInput.ScrollWheelDeltaForUI != 0)
+            {
+                int delta = -(PlayerInput.ScrollWheelDeltaForUI / 120) * ScrollStep;
+                var scrollPos = new Point(Main.mouseX, Main.mouseY);
+
+                if (_tagList != null && _tagList.GetOuterDimensions().ToRectangle().Contains(scrollPos))
+                {
+                    _tagListScroll = System.Math.Clamp(_tagListScroll + delta, 0,
+                        System.Math.Max(0, _tagListContent - (int)_tagList.GetDimensions().Height));
+                    RefreshTagList();
+                }
+                else if (_itemList != null && _itemList.GetOuterDimensions().ToRectangle().Contains(scrollPos))
+                {
+                    int itemListH = (H - HeaderH - Pad - 18 - Pad) / 2 - Pad;
+                    _itemListScroll = System.Math.Clamp(_itemListScroll + delta, 0,
+                        System.Math.Max(0, _itemListContent - itemListH));
+                    RefreshItemList();
+                }
+                else if (_searchResults != null && _searchResults.GetOuterDimensions().ToRectangle().Contains(scrollPos))
+                {
+                    int searchBoxTop = (H - HeaderH - Pad - 18 - Pad) / 2 - Pad + Pad + 18 + SearchH + Pad;
+                    int searchPanelH = H - searchBoxTop - SearchH - Pad * 2;
+                    _searchScroll = System.Math.Clamp(_searchScroll + delta, 0,
+                        System.Math.Max(0, _searchContent - searchPanelH));
+                    RefreshSearchResults();
+                }
+
+                // Consume scroll so vanilla doesn't also act on it
+                PlayerInput.ScrollWheelDeltaForUI = 0;
+            }
 
             // ── Scan tag input ────────────────────────────────────────────────
             if (_scanTagFocused)
@@ -735,6 +893,59 @@ namespace BuildingPalette
                 TagManagerUISystem.Close();
         }
 
+        /// <summary>
+        /// Appends a simple scrollbar indicator on the right edge of a panel.
+        /// Only visible when content exceeds panel height.
+        /// </summary>
+        // Screen-space thumb rectangles updated each Refresh — used for drag hit testing
+        private Rectangle _tagListThumbRect;
+        private Rectangle _itemListThumbRect;
+        private Rectangle _searchThumbRect;
+
+        private void DrawScrollbar(UIPanel panel, int scroll, int contentH, int panelH,
+            ref Rectangle thumbRectOut)
+        {
+            thumbRectOut = Rectangle.Empty;
+            if (contentH <= panelH) return;
+
+            float ratio     = (float)panelH / contentH;
+            float thumbH    = System.Math.Max(20, panelH * ratio);
+            float maxScroll = contentH - panelH;
+            float thumbY    = maxScroll > 0 ? (scroll / maxScroll) * (panelH - thumbH) : 0;
+
+            var track = new UIPanel();
+            track.Left.Set(panel.Width.Pixels - 6, 0f);
+            track.Top.Set(0, 0f);
+            track.Width.Set(5, 0f);
+            track.Height.Set(panelH, 0f);
+            track.BackgroundColor = new Color(15, 22, 40, 180);
+            track.BorderColor     = new Color(30, 50, 80, 120);
+            track.SetPadding(0);
+            panel.Append(track);
+
+            var thumb = new UIPanel();
+            thumb.Left.Set(0, 0f);
+            thumb.Top.Set((int)thumbY, 0f);
+            thumb.Width.Set(5, 0f);
+            thumb.Height.Set((int)thumbH, 0f);
+            thumb.BackgroundColor = new Color(80, 130, 200, 200);
+            thumb.BorderColor     = new Color(100, 160, 255, 0);
+            thumb.SetPadding(0);
+            track.Append(thumb);
+
+            // Store screen-space rect for drag hit testing in HandleInput
+            // Panel outer dims give us the panel's screen position
+            var panelDim = panel.GetOuterDimensions();
+            if (panelDim.Width > 0)
+            {
+                thumbRectOut = new Rectangle(
+                    (int)(panelDim.X + panel.Width.Pixels - 6),
+                    (int)(panelDim.Y + thumbY),
+                    5,
+                    (int)thumbH);
+            }
+        }
+
         private void UpdateSearchDisplay()
         {
             if (_searchDisplay == null) return;
@@ -761,12 +972,15 @@ namespace BuildingPalette
         public bool IsMouseOver()
         {
             if (_root == null) return false;
-            return _root.GetDimensions().ToRectangle().Contains(Main.mouseX, Main.mouseY);
+            var dim = _root.GetOuterDimensions().ToRectangle();
+            // Guard against uninitialized layout (all zeros before first Recalculate)
+            if (dim.Width == 0 || dim.Height == 0) return false;
+            return dim.Contains(Main.mouseX, Main.mouseY);
         }
 
-        public void HandleFocusClick(bool mouseOverPanel, bool mouseLeft)
+        public void HandleFocusClick(bool mouseOverPanel, bool mouseJustPressed)
         {
-            if (!mouseLeft) return;
+            if (!mouseJustPressed) return;
             if (!mouseOverPanel)
             {
                 _focused        = false;

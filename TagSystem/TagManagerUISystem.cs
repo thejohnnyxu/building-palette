@@ -13,6 +13,7 @@ namespace BuildingPalette
         private UserInterface  _ui;
         private TagManagerUI   _state;
         private GameTime       _lastGameTime;
+        private bool           _prevMouseLeft;
 
         private static TagManagerUISystem Instance =>
             ModContent.GetInstance<TagManagerUISystem>();
@@ -77,8 +78,10 @@ namespace BuildingPalette
 
                     bool mouseOver = _state.IsMouseOver();
 
-                    // Focus management
-                    _state.HandleFocusClick(mouseOver, Main.mouseLeft);
+                    // Focus management — edge-triggered so holding doesn't repeatedly clear
+                    bool mouseJustPressed = Main.mouseLeft && !_prevMouseLeft;
+                    _prevMouseLeft = Main.mouseLeft;
+                    _state.HandleFocusClick(mouseOver, mouseJustPressed);
 
                     if (!mouseOver) return true;
 

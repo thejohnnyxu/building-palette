@@ -6,11 +6,6 @@ using Terraria.ModLoader;
 
 namespace BuildingPalette
 {
-    /// <summary>
-    /// Draws the scan selection overlay directly in world/screen space via
-    /// PostDrawTiles. No matrix transform — positions are raw screen pixels,
-    /// computed as: tileX * 16 - Main.screenPosition.X (matching vanilla wire drawing).
-    /// </summary>
     public class ScanOverlay : ModSystem
     {
         private const int TileSize = 16;
@@ -28,12 +23,16 @@ namespace BuildingPalette
             if (TileScan.State == TileScan.ScanState.Idle) return;
             if (Main.LocalPlayer == null) return;
 
+            // Use the game's own view matrix — this is what the tile renderer uses
+            // and correctly accounts for zoom level and screen scale.
             Main.spriteBatch.Begin(
                 SpriteSortMode.Deferred,
                 BlendState.AlphaBlend,
                 SamplerState.PointClamp,
                 DepthStencilState.None,
-                RasterizerState.CullNone);
+                RasterizerState.CullNone,
+                null,
+                Main.GameViewMatrix.TransformationMatrix);
 
             if (TileScan.State == TileScan.ScanState.WaitingPoint1)
                 DrawCursorHighlight();
@@ -47,7 +46,7 @@ namespace BuildingPalette
         {
             int tx = Player.tileTargetX;
             int ty = Player.tileTargetY;
-            DrawBorderRect(TileToScreen(tx, ty, 1, 1), ColCursor, Color.Transparent, BorderPx);
+            DrawBorderRect(TileToWorld(tx, ty, 1, 1), ColCursor, Color.Transparent, BorderPx);
         }
 
         private static void DrawSelectionBox()
@@ -70,35 +69,26 @@ namespace BuildingPalette
             int h = y2 - y1 + 1;
             Color borderCol = (cappedX || cappedY) ? ColCapped : ColBox;
 
-            var rect = TileToScreen(x1, y1, w, h);
-
-            // Semi-transparent fill
+            var rect = TileToWorld(x1, y1, w, h);
             DrawRect(rect, ColFill);
-
-            // Border
             DrawBorderRect(rect, borderCol, Color.Transparent, BorderPx);
 
-            // Corner markers
             int cs = 6;
             DrawRect(new Rectangle(rect.Left,        rect.Top,         cs, cs), ColCorner);
             DrawRect(new Rectangle(rect.Right - cs,  rect.Top,         cs, cs), ColCorner);
             DrawRect(new Rectangle(rect.Left,        rect.Bottom - cs, cs, cs), ColCorner);
             DrawRect(new Rectangle(rect.Right - cs,  rect.Bottom - cs, cs, cs), ColCorner);
 
-            // Point 1 anchor marker
-            DrawBorderRect(TileToScreen(p1.X, p1.Y, 1, 1), ColCorner, Color.Transparent, BorderPx);
+            DrawBorderRect(TileToWorld(p1.X, p1.Y, 1, 1), ColCorner, Color.Transparent, BorderPx);
         }
 
-        // In PostDrawTiles, tiles are drawn at world coords scaled by zoom.
-        // Position = (worldX - screenPosition.X) * zoom
-        private static Rectangle TileToScreen(int tileX, int tileY, int tilesW, int tilesH)
+        // When using TransformationMatrix, draw in world space directly.
+        // The matrix handles the conversion from world coords to screen pixels.
+        private static Rectangle TileToWorld(int tileX, int tileY, int tilesW, int tilesH)
         {
-            float zoom = Main.GameZoomTarget;
-            int sx = (int)((tileX * TileSize - Main.screenPosition.X) * zoom);
-            int sy = (int)((tileY * TileSize - Main.screenPosition.Y) * zoom);
-            int sw = (int)(tilesW * TileSize * zoom);
-            int sh = (int)(tilesH * TileSize * zoom);
-            return new Rectangle(sx, sy, sw, sh);
+            int wx = (int)(tileX * TileSize - Main.screenPosition.X);
+            int wy = (int)(tileY * TileSize - Main.screenPosition.Y);
+            return new Rectangle(wx, wy, tilesW * TileSize, tilesH * TileSize);
         }
 
         private static void DrawRect(Rectangle r, Color color)
@@ -110,15 +100,10 @@ namespace BuildingPalette
         {
             if (fill.A > 0)
                 Main.spriteBatch.Draw(TextureAssets.MagicPixel.Value, r, fill);
-
-            Main.spriteBatch.Draw(TextureAssets.MagicPixel.Value,
-                new Rectangle(r.X, r.Y, r.Width, t), border);
-            Main.spriteBatch.Draw(TextureAssets.MagicPixel.Value,
-                new Rectangle(r.X, r.Bottom - t, r.Width, t), border);
-            Main.spriteBatch.Draw(TextureAssets.MagicPixel.Value,
-                new Rectangle(r.X, r.Y, t, r.Height), border);
-            Main.spriteBatch.Draw(TextureAssets.MagicPixel.Value,
-                new Rectangle(r.Right - t, r.Y, t, r.Height), border);
+            Main.spriteBatch.Draw(TextureAssets.MagicPixel.Value, new Rectangle(r.X, r.Y, r.Width, t), border);
+            Main.spriteBatch.Draw(TextureAssets.MagicPixel.Value, new Rectangle(r.X, r.Bottom - t, r.Width, t), border);
+            Main.spriteBatch.Draw(TextureAssets.MagicPixel.Value, new Rectangle(r.X, r.Y, t, r.Height), border);
+            Main.spriteBatch.Draw(TextureAssets.MagicPixel.Value, new Rectangle(r.Right - t, r.Y, t, r.Height), border);
         }
     }
 }

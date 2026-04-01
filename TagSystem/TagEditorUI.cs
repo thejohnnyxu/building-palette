@@ -23,7 +23,6 @@ namespace BuildingPalette
         private const int InputTop     = HeaderH + Pad + 18 + ChipsAreaH + Pad;
         private const int PanelH       = InputTop + BtnH + Pad + BtnH + Pad + BtnH + Pad;
         private const int SuggH        = 24; // height of each autocomplete row
-        private const int MaxSugg      = 3;
 
         private UIPanel    _root;
         private UIText     _titleText;
@@ -299,7 +298,6 @@ namespace BuildingPalette
                 .Distinct()
                 .Where(t => t.StartsWith(norm) && t != norm)
                 .OrderBy(t => t)
-                .Take(MaxSugg)
                 .ToList();
 
             if (suggestions.Count == 0)
