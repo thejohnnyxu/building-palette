@@ -44,16 +44,18 @@ namespace BuildingPalette
         private int _itemListScroll   = 0;
         private int _searchScroll     = 0;
         private int _tagListScroll    = 0;
-        private int _itemListContent  = 0; // total content height in pixels
+        private int _scanListScroll   = 0;
+        private int _itemListContent  = 0;
         private int _searchContent    = 0;
         private int _tagListContent   = 0;
+        private int _scanListContent  = 0;
         private const int ScrollStep  = RowH + 4;
 
         // Scrollbar drag state
-        private enum DragTarget { None, TagList, ItemList, SearchResults }
-        private DragTarget _dragTarget    = DragTarget.None;
-        private int        _dragStartY    = 0;  // mouse Y when drag started
-        private int        _dragStartScroll = 0; // scroll value when drag started
+        private enum DragTarget { None, TagList, ItemList, SearchResults, ScanList }
+        private DragTarget _dragTarget      = DragTarget.None;
+        private int        _dragStartY      = 0;
+        private int        _dragStartScroll = 0;
         private bool       _prevMouseLeftDrag = false;
 
         // Scan results mode
@@ -279,6 +281,7 @@ namespace BuildingPalette
             _scanTagFocused  = false;
             _focused         = false;
             _tick            = 0;
+            _scanListScroll  = 0;
 
             // Set explicit pixel dimensions now that we know the parent size
             _scanPanel.Left.Set(0, 0f);
@@ -355,8 +358,11 @@ namespace BuildingPalette
             _scanPanel.Append(selNoneBtn);
 
             // Scrollable item list
-            int listTop  = Pad + 26 + 6 + 22 + 6;
-            int listH    = H - HeaderH - listTop - Pad - 40 - Pad;
+            // scanPanel height = H - HeaderH, so calculate relative to that
+            int scanPanelH = H - HeaderH;
+            int listTop    = Pad + 26 + 6 + 22 + 6;
+            int bottomBarH = Pad + 32 + Pad; // tag input row
+            int listH      = scanPanelH - listTop - bottomBarH;
             _scanItemList = new UIPanel();
             _scanItemList.Left.Set(0, 0f);
             _scanItemList.Top.Set(listTop, 0f);
@@ -365,9 +371,14 @@ namespace BuildingPalette
             _scanItemList.BackgroundColor = new Color(18, 26, 44, 255);
             _scanItemList.BorderColor     = new Color(50, 80, 130, 0);
             _scanItemList.SetPadding(0);
+            _scanItemList.OverflowHidden  = true;
             _scanPanel.Append(_scanItemList);
 
-            int y = 4;
+            int contentH = _scanResults.Count * (RowH + 3);
+            _scanListContent = contentH;
+            _scanListScroll  = System.Math.Clamp(_scanListScroll, 0, System.Math.Max(0, contentH - listH));
+
+            int y = 4 - _scanListScroll;
             foreach (var (id, name) in _scanResults)
             {
                 int    capturedId   = id;
@@ -417,9 +428,10 @@ namespace BuildingPalette
                 y += RowH + 3;
             }
             _scanItemList.Recalculate();
+            DrawScrollbar(_scanItemList, _scanListScroll, _scanListContent, listH, ref _scanListThumbRect);
 
             // Tag input + Tag button at bottom
-            int bottomY = H - HeaderH - Pad - 34;
+            int bottomY = scanPanelH - Pad - 32;
 
             _scanTagBox = new UIPanel();
             _scanTagBox.Left.Set(0, 0f);
@@ -753,6 +765,7 @@ namespace BuildingPalette
                     var tagThumb  = _tagListThumbRect;   tagThumb.Inflate(4, 0);
                     var itemThumb = _itemListThumbRect;  itemThumb.Inflate(4, 0);
                     var srchThumb = _searchThumbRect;    srchThumb.Inflate(4, 0);
+                    var scanThumb = _scanListThumbRect;  scanThumb.Inflate(4, 0);
 
                     if (!tagThumb.IsEmpty  && tagThumb.Contains(mousePos))
                     {
@@ -768,9 +781,15 @@ namespace BuildingPalette
                     }
                     else if (!srchThumb.IsEmpty && srchThumb.Contains(mousePos))
                     {
-                        _dragTarget     = DragTarget.SearchResults;
-                        _dragStartY     = Main.mouseY;
+                        _dragTarget      = DragTarget.SearchResults;
+                        _dragStartY      = Main.mouseY;
                         _dragStartScroll = _searchScroll;
+                    }
+                    else if (!scanThumb.IsEmpty && scanThumb.Contains(mousePos))
+                    {
+                        _dragTarget      = DragTarget.ScanList;
+                        _dragStartY      = Main.mouseY;
+                        _dragStartScroll = _scanListScroll;
                     }
                 }
 
@@ -805,6 +824,19 @@ namespace BuildingPalette
                             _dragStartScroll + (int)(mouseDelta * ratio), 0,
                             System.Math.Max(0, _searchContent - panelH));
                         RefreshSearchResults();
+                    }
+                    else if (_dragTarget == DragTarget.ScanList && _scanListContent > 0)
+                    {
+                        int scanPanelH2 = H - HeaderH;
+                        int listTop2    = Pad + 26 + 6 + 22 + 6;
+                        int bottomBarH2 = Pad + 32 + Pad;
+                        int scanListH   = scanPanelH2 - listTop2 - bottomBarH2;
+                        float ratio     = (float)_scanListContent / scanListH;
+                        _scanListScroll = System.Math.Clamp(
+                            _dragStartScroll + (int)(mouseDelta * ratio), 0,
+                            System.Math.Max(0, _scanListContent - scanListH));
+                        BuildScanPanel();
+                        _root.Recalculate();
                     }
 
                     // Block vanilla from acting on the drag click
@@ -843,6 +875,17 @@ namespace BuildingPalette
                     _searchScroll = System.Math.Clamp(_searchScroll + delta, 0,
                         System.Math.Max(0, _searchContent - searchPanelH));
                     RefreshSearchResults();
+                }
+                else if (_scanItemList != null && _scanItemList.GetOuterDimensions().ToRectangle().Contains(scrollPos))
+                {
+                    int scanPanelH2 = H - HeaderH;
+                    int listTop2    = Pad + 26 + 6 + 22 + 6;
+                    int bottomBarH2 = Pad + 32 + Pad;
+                    int scanListH   = scanPanelH2 - listTop2 - bottomBarH2;
+                    _scanListScroll = System.Math.Clamp(_scanListScroll + delta, 0,
+                        System.Math.Max(0, _scanListContent - scanListH));
+                    BuildScanPanel();
+                    _root.Recalculate();
                 }
 
                 // Consume scroll so vanilla doesn't also act on it
@@ -901,6 +944,7 @@ namespace BuildingPalette
         private Rectangle _tagListThumbRect;
         private Rectangle _itemListThumbRect;
         private Rectangle _searchThumbRect;
+        private Rectangle _scanListThumbRect;
 
         private void DrawScrollbar(UIPanel panel, int scroll, int contentH, int panelH,
             ref Rectangle thumbRectOut)
