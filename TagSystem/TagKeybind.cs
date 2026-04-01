@@ -7,40 +7,62 @@ namespace BuildingPalette
     public class TagKeybind : ModSystem
     {
         public static ModKeybind OpenTagEditor { get; private set; }
+        public static ModKeybind OpenScanMode  { get; private set; }
 
         public override void Load()
         {
             OpenTagEditor = KeybindLoader.RegisterKeybind(Mod, "Open Tag Editor", "T");
+            OpenScanMode  = KeybindLoader.RegisterKeybind(Mod, "Start Area Scan", "OemOpenBrackets");
         }
 
         public override void Unload()
         {
             OpenTagEditor = null;
+            OpenScanMode  = null;
         }
 
         public override void UpdateUI(GameTime gameTime)
         {
-            if (OpenTagEditor == null || !OpenTagEditor.JustPressed) return;
             if (Main.drawingPlayerChat || Main.editSign || Main.editChest) return;
+
+            // ── Scan mode ─────────────────────────────────────────────────────
+            if (OpenScanMode?.JustPressed == true)
+            {
+                if (TileScan.State != TileScan.ScanState.Idle)
+                    TileScan.Cancel();
+                else
+                    TileScan.Begin();
+                return;
+            }
+
+            if (OpenTagEditor == null || !OpenTagEditor.JustPressed) return;
 
             var anchor = new Vector2(Main.mouseX, Main.mouseY);
 
-            // ── Chest tile hover → bulk tag mode ──────────────────────────────
-            // Check if the mouse is over a chest tile in the world.
-            // Player.tileTargetX/Y is the tile the cursor is pointing at.
+            // ── Item hovered (inventory open — works in Magic Storage too) ─────
+            // Main.HoverItem is set by tModLoader's ItemSlot for every rendered
+            // slot, including Magic Storage's UI grid. No special API needed.
+            var hoveredItem = Main.HoverItem;
+            if (hoveredItem != null && !hoveredItem.IsAir)
+            {
+                TagEditorUISystem.Open(hoveredItem, anchor);
+                return;
+            }
+
+            // ── World interactions (inventory closed only) ─────────────────────
+            if (Main.playerInventory) return;
+
             int tx = Player.tileTargetX;
             int ty = Player.tileTargetY;
-            if (!Main.playerInventory && IsChestTile(tx, ty))
+
+            // Chest tile → bulk tag mode
+            if (IsChestTile(tx, ty))
             {
                 int chestIdx = Chest.FindChest(tx, ty);
-                // FindChest needs top-left corner — scan nearby if needed
                 if (chestIdx < 0)
-                {
-                    // Try the four possible top-left origins for a 2x2 chest
                     for (int dx = 0; dx <= 1 && chestIdx < 0; dx++)
                         for (int dy = 0; dy <= 1 && chestIdx < 0; dy++)
                             chestIdx = Chest.FindChest(tx - dx, ty - dy);
-                }
 
                 if (chestIdx >= 0)
                 {
@@ -48,11 +70,6 @@ namespace BuildingPalette
                     return;
                 }
             }
-
-            // ── Item hover → single item mode ─────────────────────────────────
-            var hoveredItem = GetHoveredItem();
-            if (hoveredItem == null || hoveredItem.IsAir) return;
-            TagEditorUISystem.Open(hoveredItem, anchor);
         }
 
         private static bool IsChestTile(int tx, int ty)
@@ -60,13 +77,6 @@ namespace BuildingPalette
             if (!WorldGen.InWorld(tx, ty)) return false;
             var tile = Main.tile[tx, ty];
             return tile.HasTile && tile.TileType == Terraria.ID.TileID.Containers;
-        }
-
-        private static Item GetHoveredItem()
-        {
-            if (Main.HoverItem != null && !Main.HoverItem.IsAir)
-                return Main.HoverItem;
-            return null;
         }
     }
 }

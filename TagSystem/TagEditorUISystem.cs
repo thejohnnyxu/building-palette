@@ -8,6 +8,10 @@ namespace BuildingPalette
 {
     public class TagEditorUISystem : ModSystem
     {
+        // Cached empty item — avoids a new Item() allocation every frame
+        // when suppressing tooltips in the blocking layer.
+        private static readonly Item _emptyItem = new();
+
         private UserInterface _ui;
         private TagEditorUI   _state;
         private GameTime      _lastGameTime;
@@ -111,10 +115,16 @@ namespace BuildingPalette
                     if (_lastGameTime != null)
                         _ui.Update(_lastGameTime);
 
-                    // Now block vanilla from seeing it
+                    // Block vanilla from seeing it
                     Main.LocalPlayer.mouseInterface = true;
                     Main.mouseLeft                  = false;
                     Main.mouseRight                 = false;
+
+                    // Suppress item tooltips while panel is over items
+                    Main.hoverItemName = null;
+                    Main.HoverItem     = _emptyItem;
+                    Main.mouseText     = false;
+
                     return true;
                 },
                 InterfaceScaleType.UI
@@ -132,14 +142,6 @@ namespace BuildingPalette
                 {
                     if (_lastGameTime == null || _ui?.CurrentState == null)
                         return true;
-
-                    // Suppress vanilla item tooltip when mouse is over our panel
-                    if (_state != null && _state.IsMouseOver())
-                    {
-                        Main.hoverItemName  = null;
-                        Main.HoverItem      = new Item();
-                        Main.mouseText      = false;
-                    }
 
                     _ui.Draw(Main.spriteBatch, _lastGameTime);
                     return true;

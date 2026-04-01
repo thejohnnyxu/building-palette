@@ -1,4 +1,5 @@
 using System;
+using System.Linq;
 using Microsoft.Xna.Framework;
 using Terraria;
 using Terraria.ID;
@@ -261,6 +262,82 @@ namespace BuildingPalette
                 TagEditorUISystem.RefreshChips(TagEditorState.PendingItem);
 
             caller.Reply($"Renamed '{oldTag}' → '{newTag}' across {count} item(s).", Color.LightGreen);
+        }
+    }
+
+    // ── /exporttag <tagname> ──────────────────────────────────────────────────
+
+    public class ExportTagCommand : ModCommand
+    {
+        public override string Command     => "exporttag";
+        public override CommandType Type   => CommandType.Chat;
+        public override string Description => "Export a tag and its items as a shareable string.";
+        public override string Usage       => "/exporttag <tagname>";
+
+        public override void Action(CommandCaller caller, string input, string[] args)
+        {
+            if (args.Length == 0)
+            {
+                caller.Reply("Usage: /exporttag <tagname>", Color.Orange);
+                return;
+            }
+
+            string tag = TagSystem.Normalize(string.Join("-", args));
+
+            // Check any items actually have this tag
+            bool exists = TagSystem.GetAllTags().Any(kv => kv.Value.Contains(tag));
+            if (!exists)
+            {
+                caller.Reply($"No items found with tag '{tag}'.", Color.Orange);
+                return;
+            }
+
+            string exported = TagImportExport.Export(tag);
+            caller.Reply("Copy the line below and share it:", Color.Cyan);
+            caller.Reply(exported, Color.White);
+        }
+    }
+
+    // ── /importtag <string> ───────────────────────────────────────────────────
+
+    public class ImportTagCommand : ModCommand
+    {
+        public override string Command     => "importtag";
+        public override CommandType Type   => CommandType.Chat;
+        public override string Description => "Import a tag string exported by /exporttag.";
+        public override string Usage       => "/importtag <tagname:Item One,Item Two>";
+
+        public override void Action(CommandCaller caller, string input, string[] args)
+        {
+            if (args.Length == 0)
+            {
+                caller.Reply("Usage: /importtag warm-stone:Sandstone Block,Smooth Sandstone", Color.Orange);
+                return;
+            }
+
+            // Rejoin args — the import string may contain spaces
+            string importStr = string.Join(" ", args);
+            var result = TagImportExport.Import(importStr);
+
+            if (result.Warnings.Count > 0 && result.Added == 0)
+            {
+                foreach (var w in result.Warnings)
+                    caller.Reply($"Error: {w}", Color.Orange);
+                return;
+            }
+
+            caller.Reply($"Imported '{result.Tag}': added {result.Added} item(s).", Color.LightGreen);
+
+            if (result.NotFound.Count > 0)
+                caller.Reply($"Not found: {string.Join(", ", result.NotFound)}", Color.Orange);
+
+            if (result.Warnings.Count > 0)
+                foreach (var w in result.Warnings)
+                    caller.Reply($"Warning: {w}", Color.Yellow);
+
+            // Refresh Tag Manager if open
+            if (TagManagerUISystem.IsOpen)
+                TagManagerUISystem.RefreshAll();
         }
     }
 }

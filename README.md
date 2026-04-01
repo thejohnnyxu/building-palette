@@ -55,6 +55,17 @@ All commands operate on the item most recently opened with **T**.
 
 Multi-word tag names are joined with hyphens automatically — `/tag warm stone` adds `warm-stone`.
 
+### `/alltags` output
+
+```
+All tags (3):
+  #warm-stone: [icon] Sandstone Block, [icon] Mud Block
+  #exterior:   [icon] Granite Block, [icon] Sandstone Block
+  #natural:    [icon] Mossy Stone Block
+```
+
+Each tag renders in a consistent color. Item icons appear inline in the chat window.
+
 ---
 
 ## Notes

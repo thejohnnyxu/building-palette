@@ -21,7 +21,7 @@ namespace BuildingPalette
         private const int BtnW         = 68;
         private const int BtnH         = 28;
         private const int InputTop     = HeaderH + Pad + 18 + ChipsAreaH + Pad;
-        private const int PanelH       = InputTop + BtnH + Pad + BtnH + Pad;
+        private const int PanelH       = InputTop + BtnH + Pad + BtnH + Pad + BtnH + Pad;
         private const int SuggH        = 24; // height of each autocomplete row
         private const int MaxSugg      = 3;
 
@@ -132,6 +132,21 @@ namespace BuildingPalette
             cancelBtn.BorderColor     = new Color(130, 60, 60, 255);
             cancelBtn.OnLeftClick    += (_, _) => TagEditorUISystem.Close();
             _root.Append(cancelBtn);
+
+            // Manage Tags button — opens the full tag manager panel
+            var manageBtn = new UITextPanel<string>("Manage Tags", 0.65f);
+            manageBtn.Left.Set(Pad, 0f);
+            manageBtn.Top.Set(InputTop + BtnH + Pad + BtnH + Pad - 2, 0f);
+            manageBtn.Width.Set(PanelW - Pad * 2, 0f);
+            manageBtn.Height.Set(BtnH, 0f);
+            manageBtn.BackgroundColor = new Color(30, 50, 40, 255);
+            manageBtn.BorderColor     = new Color(60, 120, 80, 255);
+            manageBtn.OnLeftClick    += (_, _) =>
+            {
+                TagEditorUISystem.Close();
+                TagManagerUISystem.Open();
+            };
+            _root.Append(manageBtn);
 
             // Autocomplete dropdown — starts hidden, sits below the input box
             _autocompletePanel = new UIPanel();

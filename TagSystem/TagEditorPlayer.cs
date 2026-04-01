@@ -110,8 +110,26 @@ namespace BuildingPalette
 
         // ── PreUpdate ────────────────────────────────────────────────────────
 
+        // Track previous mouseLeft state for edge detection in scan mode
+        private static bool _prevMouseLeft = false;
+
         public override void PreUpdate()
         {
+            bool mouseJustPressed = Main.mouseLeft && !_prevMouseLeft;
+            _prevMouseLeft = Main.mouseLeft;
+
+            // ── Scan mode click detection ──────────────────────────────────────
+            if (TileScan.State != TileScan.ScanState.Idle
+            && !Main.playerInventory
+            && mouseJustPressed
+            && !Main.LocalPlayer.mouseInterface)
+            {
+                Main.LocalPlayer.mouseInterface = true;
+                Main.mouseLeft = false;
+                TileScan.HandleClick(Player.tileTargetX, Player.tileTargetY);
+                return;
+            }
+
             if (!IsActive) return;
 
             // Note: focus gain/loss is handled in TagEditorUISystem's blocking

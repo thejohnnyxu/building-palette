@@ -12,4 +12,8 @@ Items: {
 	}
 }
 
-"Keybinds.Open Tag Editor.DisplayName": Open  Tag  Editor
+Keybinds: {
+	"Open Tag Editor.DisplayName": Open  Tag  Editor
+	"Start Area Scan.DisplayName": Start  Area  Scan
+	"Eye Dropper (Pick Tile).DisplayName": Eye  Dropper ( Pick  Tile)
+}

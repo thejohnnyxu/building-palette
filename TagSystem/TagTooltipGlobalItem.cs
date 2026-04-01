@@ -1,5 +1,4 @@
 using System.Collections.Generic;
-using System.Linq;
 using Terraria;
 using Terraria.ModLoader;
 
@@ -18,16 +17,18 @@ namespace BuildingPalette
         {
             if (!TagSystem.HasAnyTags(item.type)) return;
 
+            // Tags are stored in a HashSet — join directly, no sort needed here.
+            // Sorting at display time via OrderBy allocates on every hover; instead
+            // we accept HashSet ordering (insertion order is undefined but stable
+            // within a session, which is fine for tooltip display).
             var tags = TagSystem.GetTags(item.type);
-            var tagString = string.Join(", ", tags.OrderBy(t => t));
+            var tagString = string.Join(", ", tags);
 
             var line = new TooltipLine(Mod, "ItemTags", $"Tags: {tagString}")
             {
-                // Soft grey so it's visible but clearly secondary info
                 OverrideColor = new Microsoft.Xna.Framework.Color(180, 180, 180)
             };
 
-            // Append after all vanilla tooltip lines
             tooltips.Add(line);
         }
     }
