@@ -1,86 +1,75 @@
 # Building Palette
 
-A Terraria mod for builders who spend too long digging through storage looking for the right block.
-
-## The Problem
-
-Starting a build means deciding on a palette — which blocks, walls, and materials will work together. But in Terraria, finding and grabbing those blocks from storage is friction. You're either opening Magic Storage and searching by name (if you remember it), or scrolling endlessly through your chest. There's no way to say "these ten blocks are my desert build palette" and get them all at once.
-
-## The Solution
-
-Building Palette lets you tag any item with custom labels. Once tagged, items show up in Magic Storage search when you type the tag name. Want your warm desert palette? Tag sandstone, smooth sandstone, and palm wood with `desert-warm`, then search `desert-warm` in Magic Storage and grab everything at once.
+> A Terraria tModLoader mod for builders. Tag items with custom labels and find them instantly in Magic Storage.
 
 ---
 
-## How to Use It
+## How it works
 
-### Tagging an item
+Tags appear in item tooltips. Magic Storage indexes tooltip text, so typing a tag name in the search box filters to all matching items — no Magic Storage integration required.
 
-1. Open your inventory
-2. Hover over any item
-3. Press **T** — a panel opens showing that item's current tags
-4. Type a tag name in the input box and click **Add** (or press Enter)
-5. Click **Cancel** or press **Esc** to close
+---
 
-Tags are lowercase, letters/numbers/hyphens only. `warm-stone`, `exterior`, `cave-ceiling` are all valid.
+## Tagging an item
 
-### Removing a tag
+1. Open your inventory and hover any item
+2. Press **T** to open the tag editor
+3. Click the input box — it glows blue when focused
+4. Type a tag name and press **Enter** or click **Add**
+5. Press **Esc** or **Cancel** to close
 
-Open the panel with T, then click the tag chip you want to remove (it has a small × on it).
+Click any tag chip to remove it. Clicking outside the panel unfocuses it — **Enter** and **Esc** behave normally in the game until you click back inside.
 
-### Searching in Magic Storage
+**Valid tag names:** lowercase letters, numbers, and hyphens — e.g. `warm-stone`, `cave-ceiling`, `palette-a`
 
-Tags appear in item tooltips as `Tags: tagname, tagname`. Magic Storage indexes tooltip text, so just type your tag name in the search box and it'll filter to matching items automatically.
+---
 
-### Commands
+## Bulk tagging a chest
 
-All commands work whether or not the panel is open. Press T over an item to select it, then use these from chat:
+1. **Close your inventory first**
+2. Hover a chest tile in the world
+3. Press **T**
 
-| Command | What it does |
+The panel opens in bulk mode showing `Chest (X items)`. Any tag you add is applied to every item in the chest. Removing a chip removes that tag from all chest items.
+
+---
+
+## Searching in Magic Storage
+
+Type your tag name in Magic Storage's search box. All items with that tag show up in results.
+
+---
+
+## Commands
+
+All commands operate on the item most recently opened with **T**.
+
+| Command | Description |
 |---|---|
-| `/tag <name>` | Add a tag to the selected item |
-| `/untag <name>` | Remove a tag from the selected item |
+| `/tag <n>` | Add a tag to the selected item |
+| `/untag <n>` | Remove a tag from the selected item |
 | `/tags` | List all tags on the selected item |
 | `/tagdone` | Deselect the current item |
-| `/alltags` | Show every tracked tag and which items are in it |
+| `/renametag <old> <new>` | Rename a tag across every item that has it |
+| `/alltags` | List every tracked tag and the items in each |
 
-Multi-word tag arguments get joined with hyphens automatically — `/tag warm stone` becomes `warm-stone`.
-
-### `/alltags` output
-
-```
-All tags (3):
-  #warm-stone: [wood icon]Wood, [sandstone icon]Sandstone Block
-  #exterior:   [granite icon]Granite Block
-  #natural:    [moss icon]Mossy Stone Block
-```
-
-Each tag shows with a distinct color. Item icons render inline in the chat window.
+Multi-word tag names are joined with hyphens automatically — `/tag warm stone` adds `warm-stone`.
 
 ---
 
-## Tips
+## Notes
 
-- Tags travel with your **character**, not the world — your palettes follow you across worlds
-- You can tag modded items exactly the same way as vanilla ones
-- Tag names are case-insensitive — `Warm-Stone` and `warm-stone` are the same tag
-- The T keybind won't fire if chat is already open, so it won't interfere with normal typing
+- Tags are saved to your **character file** — they travel with you across worlds
+- Works on vanilla and modded items
+- Tags are case-insensitive (`Warm-Stone` and `warm-stone` are the same)
+- Autocomplete suggests existing tags as you type (prefix match, up to 3 suggestions)
 
 ---
 
-## Files
+## Installation
 
+Drop the `BuildingPalette` folder into:
 ```
-BuildingPalette/
-  build.txt
-  BuildingPalette.cs
-  TagSystem/
-    TagSystem.cs              — core data store
-    TagPlayer.cs              — save/load tags to player file
-    TagKeybind.cs             — T keybind + hover detection
-    TagTooltipGlobalItem.cs   — appends tags to item tooltips
-    TagEditorUI.cs            — the tag editor panel (UIState)
-    TagEditorUISystem.cs      — registers the UI layer
-    TagEditorPlayer.cs        — handles keyboard input and mouse blocking
-    TagCommands.cs            — all /tag commands
+Documents/My Games/Terraria/tModLoader/ModSources/
 ```
+Then build and enable it from the tModLoader Mod Sources menu.

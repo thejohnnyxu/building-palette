@@ -209,4 +209,58 @@ namespace BuildingPalette
             }
         }
     }
+
+    // ── /renametag <old> <new> ────────────────────────────────────────────────
+
+    public class RenameTagCommand : ModCommand
+    {
+        public override string Command     => "renametag";
+        public override CommandType Type   => CommandType.Chat;
+        public override string Description => "Rename a tag across all items.";
+        public override string Usage       => "/renametag <oldname> <newname>";
+
+        public override void Action(CommandCaller caller, string input, string[] args)
+        {
+            if (args.Length < 2)
+            {
+                caller.Reply("Usage: /renametag <oldname> <newname>", Color.Orange);
+                return;
+            }
+
+            string oldTag = TagSystem.Normalize(args[0]);
+            string newTag = TagSystem.Normalize(args[1]);
+
+            if (string.IsNullOrWhiteSpace(oldTag) || string.IsNullOrWhiteSpace(newTag))
+            {
+                caller.Reply("Invalid tag name.", Color.Orange);
+                return;
+            }
+
+            if (oldTag == newTag)
+            {
+                caller.Reply("Old and new tag names are the same.", Color.Orange);
+                return;
+            }
+
+            int count = 0;
+            foreach (var (itemId, tagSet) in TagSystem.GetAllTags())
+            {
+                if (!tagSet.Contains(oldTag)) continue;
+                tagSet.Remove(oldTag);
+                tagSet.Add(newTag);
+                count++;
+            }
+
+            if (count == 0)
+            {
+                caller.Reply($"No items found with tag '{oldTag}'.", Color.Orange);
+                return;
+            }
+
+            if (TagEditorState.IsOpen && TagEditorState.PendingItem != null)
+                TagEditorUISystem.RefreshChips(TagEditorState.PendingItem);
+
+            caller.Reply($"Renamed '{oldTag}' → '{newTag}' across {count} item(s).", Color.LightGreen);
+        }
+    }
 }

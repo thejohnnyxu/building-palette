@@ -35,10 +35,19 @@ namespace BuildingPalette
         {
             var inst = Instance;
             if (inst == null) return;
-
-TagEditorPlayer.SetItem(item);
+            TagEditorPlayer.SetItem(item);
             TagEditorState.SetItem(item);
             inst._state.SetItem(item, anchor);
+            inst._ui.SetState(inst._state);
+        }
+
+        public static void OpenBulk(int chestIdx, Vector2 anchor)
+        {
+            var inst = Instance;
+            if (inst == null) return;
+            TagEditorPlayer.SetBulk(chestIdx);
+            TagEditorState.Clear();
+            inst._state.SetBulk(chestIdx, anchor);
             inst._ui.SetState(inst._state);
         }
 
@@ -60,6 +69,9 @@ TagEditorPlayer.SetItem(item);
         public static void RefreshChips(Item item) =>
             Instance?._state?.RefreshChips(item);
 
+        public static void RefreshBulkChips(int chestIdx) =>
+            Instance?._state?.RefreshBulkChips(chestIdx);
+
         // ── Update + Draw ─────────────────────────────────────────────────────
 
         public override void UpdateUI(GameTime gameTime)
@@ -75,14 +87,25 @@ TagEditorPlayer.SetItem(item);
             if (idx < 0) idx = layers.Count - 1;
 
             // ── Early blocking layer (before inventory) ────────────────────────
-            // We run _ui.Update() here first so our buttons see the click,
-            // THEN we zero mouseLeft/mouseRight so vanilla inventory never sees it.
             layers.Insert(idx, new LegacyGameInterfaceLayer(
                 "BuildingPalette: Tag Editor Block",
                 () =>
                 {
                     if (_ui?.CurrentState == null || _state == null) return true;
-                    if (!_state.IsMouseOver()) return true;
+
+                    bool mouseOver = _state.IsMouseOver();
+
+                    // Handle focus here — mouseLeft is still true at this point.
+                    // PreUpdate runs later and would see mouseLeft=0 after we zero it.
+                    if (TagEditorUISystem.IsOpen)
+                    {
+                        if (mouseOver && Main.mouseLeft)
+                            TagEditorPlayer.SetFocused(true);
+                        else if (!mouseOver && Main.mouseLeft)
+                            TagEditorPlayer.SetFocused(false);
+                    }
+
+                    if (!mouseOver) return true;
 
                     // Let our UI handle the click first
                     if (_lastGameTime != null)
@@ -107,8 +130,18 @@ TagEditorPlayer.SetItem(item);
                 "BuildingPalette: Tag Editor",
                 () =>
                 {
-                    if (_lastGameTime != null && _ui?.CurrentState != null)
-                        _ui.Draw(Main.spriteBatch, _lastGameTime);
+                    if (_lastGameTime == null || _ui?.CurrentState == null)
+                        return true;
+
+                    // Suppress vanilla item tooltip when mouse is over our panel
+                    if (_state != null && _state.IsMouseOver())
+                    {
+                        Main.hoverItemName  = null;
+                        Main.HoverItem      = new Item();
+                        Main.mouseText      = false;
+                    }
+
+                    _ui.Draw(Main.spriteBatch, _lastGameTime);
                     return true;
                 },
                 InterfaceScaleType.UI

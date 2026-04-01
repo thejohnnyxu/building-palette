@@ -4,10 +4,6 @@ using Terraria.ModLoader;
 
 namespace BuildingPalette
 {
-    /// <summary>
-    /// Registers the "T" keybind and detects which item the player
-    /// is hovering when it's pressed. Hands off to TagEditorUI.
-    /// </summary>
     public class TagKeybind : ModSystem
     {
         public static ModKeybind OpenTagEditor { get; private set; }
@@ -24,40 +20,52 @@ namespace BuildingPalette
 
         public override void UpdateUI(GameTime gameTime)
         {
-            // Only act when the keybind is freshly pressed (not held)
             if (OpenTagEditor == null || !OpenTagEditor.JustPressed) return;
-
-            // Don't fire during text input (e.g. chat, signs, etc.)
             if (Main.drawingPlayerChat || Main.editSign || Main.editChest) return;
 
+            var anchor = new Vector2(Main.mouseX, Main.mouseY);
+
+            // ── Chest tile hover → bulk tag mode ──────────────────────────────
+            // Check if the mouse is over a chest tile in the world.
+            // Player.tileTargetX/Y is the tile the cursor is pointing at.
+            int tx = Player.tileTargetX;
+            int ty = Player.tileTargetY;
+            if (!Main.playerInventory && IsChestTile(tx, ty))
+            {
+                int chestIdx = Chest.FindChest(tx, ty);
+                // FindChest needs top-left corner — scan nearby if needed
+                if (chestIdx < 0)
+                {
+                    // Try the four possible top-left origins for a 2x2 chest
+                    for (int dx = 0; dx <= 1 && chestIdx < 0; dx++)
+                        for (int dy = 0; dy <= 1 && chestIdx < 0; dy++)
+                            chestIdx = Chest.FindChest(tx - dx, ty - dy);
+                }
+
+                if (chestIdx >= 0)
+                {
+                    TagEditorUISystem.OpenBulk(chestIdx, anchor);
+                    return;
+                }
+            }
+
+            // ── Item hover → single item mode ─────────────────────────────────
             var hoveredItem = GetHoveredItem();
             if (hoveredItem == null || hoveredItem.IsAir) return;
-
-            // Capture mouse position as the anchor point for the panel.
-            // We use the mouse position rather than slot position because
-            // tModLoader doesn't expose individual slot screen rects easily.
-            // The panel will appear just to the right of the cursor.
-            TagEditorUISystem.Open(hoveredItem, new Vector2(Main.mouseX, Main.mouseY));
+            TagEditorUISystem.Open(hoveredItem, anchor);
         }
 
-        // ── Hover Detection ──────────────────────────────────────────────────
+        private static bool IsChestTile(int tx, int ty)
+        {
+            if (!WorldGen.InWorld(tx, ty)) return false;
+            var tile = Main.tile[tx, ty];
+            return tile.HasTile && tile.TileType == Terraria.ID.TileID.Containers;
+        }
 
-        /// <summary>
-        /// Finds the item currently under the cursor across all common
-        /// inventory slots: hotbar, main inventory, armor, and chest/storage UI.
-        /// Returns null if nothing is hovered.
-        /// </summary>
         private static Item GetHoveredItem()
         {
-            // tModLoader sets Main.HoverItem when the cursor is over an item slot.
-            // It's always current-frame so this is the safest single source of truth.
             if (Main.HoverItem != null && !Main.HoverItem.IsAir)
                 return Main.HoverItem;
-
-            // Fallback: check if the mouse is over a slot in the player's inventory.
-            // Main.mouseItem is the item being dragged; skip it.
-            // ItemSlot.Context gives us more granular control if needed later.
-
             return null;
         }
     }

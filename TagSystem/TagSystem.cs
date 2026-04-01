@@ -72,7 +72,9 @@ namespace BuildingPalette
         public static Dictionary<int, HashSet<string>> GetAllTags() => _tags;
 
         /// <summary>
-        /// Replaces the entire tag dictionary on load.
+        /// Points _tags at the local player's instance dictionary.
+        /// MUST be the same reference — not a copy — so that AddTag/RemoveTag
+        /// mutations are visible when SaveData reads TagPlayer.Tags.
         /// </summary>
         public static void LoadAllTags(Dictionary<int, HashSet<string>> saved)
         {
