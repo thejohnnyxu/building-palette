@@ -106,7 +106,7 @@ namespace BuildingPalette
             _root.Append(addBtn);
 
             // ── Bottom row: hint left, cancel right ───────────────────────────
-            var hint = new UIText("T / Esc to close", 0.6f);
+            var hint = new UIText("Esc to close", 0.6f);
             hint.Left.Set(Pad, 0f);
             hint.Top.Set(InputTop + BtnH + Pad, 0f);
             _root.Append(hint);
@@ -146,7 +146,7 @@ namespace BuildingPalette
             _root.Top.Set(y, 0f);
 
             RefreshChips(item);
-            SetInputText("");
+            SetInputText("|");
             Recalculate();
         }
 
@@ -196,9 +196,9 @@ namespace BuildingPalette
             _chipsArea.Recalculate();
         }
 
-        public void SetInputText(string text)
+        public void SetInputText(string display)
         {
-            _inputDisplay?.SetText(string.IsNullOrEmpty(text) ? "new tag..." : text);
+            _inputDisplay?.SetText(display);
         }
 
         public bool IsMouseOver()

@@ -5,23 +5,17 @@ using Terraria.ModLoader.IO;
 
 namespace BuildingPalette
 {
-    /// <summary>
-    /// Handles per-player persistence of tags via tModLoader's TagCompound system.
-    /// Tags are saved to the player's .tplr file and travel with the character.
-    /// </summary>
     public class TagPlayer : ModPlayer
     {
-        // ── tModLoader Hooks ─────────────────────────────────────────────────
+        // Ensure this ModPlayer is always saved even if no tags exist yet
+        protected override bool CloneNewInstances => false;
 
         public override void SaveData(TagCompound tag)
         {
-            // Serialize: Dictionary<int, HashSet<string>> → TagCompound
-            // We store each itemId as a string key (TagCompound keys must be strings)
-            // and each tag set as a List<string>.
-
             var allTags = TagSystem.GetAllTags();
-            var compound = new TagCompound();
+            if (allTags.Count == 0) return;
 
+            var compound = new TagCompound();
             foreach (var (itemId, tagSet) in allTags)
             {
                 if (tagSet.Count == 0) continue;
@@ -35,19 +29,19 @@ namespace BuildingPalette
         {
             var result = new Dictionary<int, HashSet<string>>();
 
-            if (!tag.ContainsKey("itemTags")) return;
+            if (!tag.ContainsKey("itemTags"))
+            {
+                TagSystem.LoadAllTags(result);
+                return;
+            }
 
             var compound = tag.Get<TagCompound>("itemTags");
 
-            // TagCompound implements IEnumerable<KeyValuePair<string, object>>
-            // — iterate as pairs rather than using .Keys
             foreach (var pair in compound)
             {
                 if (!int.TryParse(pair.Key, out int itemId)) continue;
-
                 var tagList = compound.GetList<string>(pair.Key);
                 if (tagList == null || tagList.Count == 0) continue;
-
                 result[itemId] = new HashSet<string>(tagList);
             }
 
@@ -56,21 +50,16 @@ namespace BuildingPalette
 
         public override void OnEnterWorld()
         {
-            // Nothing needed here — LoadData fires before this.
-            // Good place for future "welcome back" logic if needed.
+            // LoadData fires before this — good place to confirm tags loaded
+            Main.NewText($"[Building Palette] Loaded {TagSystem.GetAllTags().Count} tagged items.", 
+                Microsoft.Xna.Framework.Color.Gray);
         }
 
         public override void PlayerDisconnect()
         {
-            // Wipe runtime state so tags don't bleed to the next
-            // character loaded in the same session.
+            // SaveData fires automatically before disconnect.
+            // Clear after so tags don't bleed to next character in same session.
             TagSystem.Clear();
-        }
-
-        public override void PreSavePlayer()
-        {
-            // SaveData fires automatically; this is just a hook if
-            // we need pre-save cleanup later.
         }
     }
 }
