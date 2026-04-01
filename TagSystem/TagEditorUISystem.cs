@@ -43,6 +43,7 @@ namespace BuildingPalette
             }
 
             TagEditorPlayer.SetItem(item);
+            TagEditorState.SetItem(item);
             inst._state.SetItem(item, anchor);
             inst._ui.SetState(inst._state);
         }
@@ -52,6 +53,7 @@ namespace BuildingPalette
             var inst = Instance;
             if (inst == null) return;
             TagEditorPlayer.ClearItem();
+            TagEditorState.Clear();
             inst._ui.SetState(null);
         }
 
@@ -64,7 +66,25 @@ namespace BuildingPalette
         public static void RefreshChips(Item item) =>
             Instance?._state?.RefreshChips(item);
 
-        // ── Update + Draw ─────────────────────────────────────────────────────
+        // ── Mouse blocking ────────────────────────────────────────────────────
+        // PreUpdateEntities runs AFTER UI updates (so GetDimensions() is valid)
+        // but BEFORE player/inventory input processes clicks.
+        // This is the correct place to set mouseInterface reliably.
+        public override void PreUpdateEntities()
+        {
+            if (!IsOpen) return;
+            if (_state == null) return;
+            if (!Main.playerInventory) return; // inventory not open, nothing to block
+
+            if (_state.IsMouseOver())
+            {
+                Main.LocalPlayer.mouseInterface = true;
+                Main.mouseLeft  = false;
+                Main.mouseRight = false;
+            }
+        }
+
+
 
         public override void UpdateUI(GameTime gameTime)
         {
@@ -75,9 +95,10 @@ namespace BuildingPalette
 
         public override void ModifyInterfaceLayers(List<GameInterfaceLayer> layers)
         {
-            // Before "Vanilla: Inventory" per ExampleMod guidance
+            // After "Vanilla: Inventory" so it draws on top of it
             int idx = layers.FindIndex(l => l.Name == "Vanilla: Inventory");
             if (idx < 0) idx = layers.Count - 1;
+            else idx++; // insert after, not before
 
             layers.Insert(idx, new LegacyGameInterfaceLayer(
                 "BuildingPalette: Tag Editor",

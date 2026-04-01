@@ -34,16 +34,7 @@ namespace BuildingPalette
         {
             if (!IsActive) return;
 
-            // ── Mouse blocking ────────────────────────────────────────────────
-            // PreUpdate is before ALL UI layers and inventory processing.
-            // Setting mouseInterface here reliably blocks item pickup,
-            // tile placement, and inventory interaction.
-            var ui = TagEditorUISystem.GetState();
-            if (ui != null && ui.IsMouseOver())
-                Player.mouseInterface = true;
-
             // ── Text input ────────────────────────────────────────────────────
-            // WritingText + HandleIME enables GetInputText to receive characters.
             PlayerInput.WritingText = true;
             Main.instance.HandleIME();
 
