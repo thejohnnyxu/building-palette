@@ -14,7 +14,7 @@ using System.Reflection;
 [assembly: System.Reflection.AssemblyCompanyAttribute("BuildingPalette")]
 [assembly: System.Reflection.AssemblyConfigurationAttribute("Debug")]
 [assembly: System.Reflection.AssemblyFileVersionAttribute("1.0.0.0")]
-[assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.0.0+fde949ab9be0246e85d373e9c4eee2a2595ff954")]
+[assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.0.0+25ef533e9dc027c2b0231517bc3a794b273323f9")]
 [assembly: System.Reflection.AssemblyProductAttribute("BuildingPalette")]
 [assembly: System.Reflection.AssemblyTitleAttribute("BuildingPalette")]
 [assembly: System.Reflection.AssemblyVersionAttribute("1.0.0.0")]
