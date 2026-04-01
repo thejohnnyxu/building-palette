@@ -1,1 +1,40 @@
-Modify this file with a description of your mod.
+Tag any item with custom labels and find it instantly in Magic Storage. 
+Tags appear in item tooltips and can be found in Magic Storage using the # search modifier.
+Recommend using Magic Storage for best experience.
+
+==== Features ====
+
+[Tagging]
+- Press T over any item in your inventory, chest, or Magic Storage to open the tag editor
+- Autocomplete suggests your existing tags as you type
+- Bulk chest tagging: hover a closed chest in the world and press T to tag every item inside at once
+- Tag Manager: browse all your tags, see which items are in each, and search the full vanilla + modded item database to add or remove entries
+- Tags persist to your character file and travel across worlds
+
+[Eye Dropper]
+--Eye Dropper: press F over a tile in the world to select its item from your inventory, or hover any item slot in your inventory or Magic Storage and press F to move it to your hotbar
+- Eye Dropper correctly identifies tile variants (glass door vs wooden door, furniture styles, etc.)
+- Eye Dropper also works on wall tiles
+
+[Scanning]
+- Area Scan: press [ or /scan, click two points in the world, and every unique block and wall inside the box is collected and loaded into the Tag Manager ready to tag
+
+[Chat Commands]
+/tag <name>: Adds a tag to the selected item. Multi-word names join with hyphens: /tag warm stone → warm-stone
+/untag <name>: Removes a tag from the selected item
+/tags: Lists all tags on the selected item in chat
+/tagdone: Deselects the current item
+/renametag <old> <new>: Renames a tag across every item that has it
+/alltags: Prints every tag and its items. Tags are color-coded with inline item icons
+/exporttag <name>: Serializes a tag to a shareable string in chat
+/importtag <string>: Recreates a tag from an export string. Ambiguous item names are skipped with a warning
+/scan: Toggles area scan mode. Cancels if already active
+
+[Keybinds]
+You can customize your hotkeys from the Controls menu
+T — Open tag editor (hover any item or chest)
+F — Eye dropper (pick tile or inventory item)
+[ — Start / cancel area scan
+
+//Known Issues//
+- Import & Export is currently not working
